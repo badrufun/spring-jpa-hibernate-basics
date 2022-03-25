@@ -1,0 +1,192 @@
+
+1. Problem with JDBC
+    - Writing queries
+    - Connection management
+    - Mapping data in query
+    - Mapping data to object
+    - No worry about type of data
+
+2. JPA (Java Persistence API)
+    - Standards for saving ORM
+    - Help to switch any ORM with minimum changes
+
+3. Hibernate annotations
+    -
+      @Repository  -----> Can't delete any entry only select will work
+      @Transactional  ----> Mandatory to keep this annotation for delete any entry
+      public class PersonJpaRepository {
+
+          @PersistenceContext
+          private EntityManager manager;
+          public List<Person> findAll(){
+             TypedQuery<Person> q = manager.createNamedQuery("find_all_person", Person.class);
+             (using named query and query defined using @NamedQueries/@NameQuery)
+             return q.getResultList();
+          }
+      }
+
+    -
+     @Entity
+     @Table(name = "person")
+     @NamedQuery(name = "find_all_person", query = "select p from Person p")
+     public class Person {
+
+         @Id
+         @GeneratedValue
+         @Column(name="row_id" nullable=false) --> this column can't have null value.(insertable, unique, updatable)
+         private long id;
+
+         @UpdatedTimestamp   --> Update current timestamp on each update
+         private LocalDateTime updated;
+
+         @CreatedTimestamp   --> insert current timestamp while inserting
+         private LocalDateTime created;
+     }
+
+     - @Embeddable --> Instead of @Entity we can use this
+                       When we wanted the current class attribute embedded with some other class use @Embeddable on current class
+                       Eg:
+                            @Embeddable
+                            public class Address{}
+     - @Embedded -->  Use on ref variable of Embeddable class eg in student class
+                       @Embedded
+                       private Address studentAddress;
+
+                      Now Address class field are embedded in Student class entity.
+
+     - @Enumerated --> Used to specify the reference used in entity is an enum.
+
+4:  EntityManager
+    - @Transactional - eManager will consider each method as one transaction.
+    - @Transactional for entity manager make sure any change to entity should be updated in DB
+        public void playWithEntityManager(){
+                Course course = new Course("Entity Manager");
+                eManager.persist(course);
+                course.setName("Entity Manager - Updated"); ----> Even though we are not saving this,
+                                                                  but it will updated in DB.
+                                                                  B'coz of @Transactional used on entity manager
+        }
+    - To stop entity manager to save data use
+            eManager.detach(course); --> change to course will not be updated in db
+            eManage.clear() --> changes to any entity used in method not be updated in db.
+    - eManager.flush() --> will update changes to entity in db instantly.
+    - eManager.refresh(course); --> All the changes made to entity object will be lost.
+      iff flush() is not used. flush() will update changes made in object to db and
+      changes will be no more at entity object level.
+
+    - EntityManager is an interface to something called as persistence context
+    - Persistence context keeps track of all entity that changes during a transaction
+        and track all changes that needs to stored in DB.
+    - Each transaction has its own Persistence Context
+
+5: Point to remember
+    - JPQL --> Java Persistence Query Language (Used to query from Entity rather than db).
+        (Also nativeQuery can be use to run on db rather than entity)
+    - TypedQuery<> is better than query and needs type of result returned from query.
+        TypedQuery<Course> q = eManager.createQuery("select c from Course c", Course.class);
+        (can used name query.)
+        List<Course> cList = q.getResultList();
+    -Native query is better to use in mass update. JPA will fetch each row and update.
+        eManager.createNativeQuery("update course set name='Java' where id:id");
+        While using native query persistence context will not be used so we need to refresh() all entity available.
+
+6:  Relationship
+    - OneToOne
+        @OneToOne(fetch = FetchType.LAZY) --> By default 1to1 is eager loading,
+        @JoinColumn(name = "passport_id")       method should be @Transactional for lazy loading
+        private Passport passport;              else getting inner obj will throw exception for session closed
+
+
+
+    - To make the relation @OneToOne bi-direction
+        @OneToOne(fetch = FetchType.LAZY, mappedBy = "passport") --> in Passport.class put a Student ref
+        private Student student;                                     but this will create another column in passport table
+                                                                     used mappedBy in Passport.class Student ref
+                                                                     means Student table will own the responsibility to maintain relation by passport id
+
+    - OneToMany & ManyToOne (OneToMany- default lazy load, ManyToOne is eager fetch)
+        @OneToMany(fetch = FetchType.LAZY, mappedBy = "course") --> course class field review maps with many review for a course
+        private List<Review> reviews = new ArrayList<>();           So, it is 1toMany relationship, but ManyTo1 for Reviews class
+                                                                    Review class owns relationship, course_id will store in reviews table. (Used mappedBy for course)
+                                                                    if not mapping by course then an other mapping table will be created for Course to Review ManyTo1 relationship
+
+        @ManyToOne(fetch = FetchType.LAZY) --> Many reviews can be for same course, ManyTo1 relationship review to course.
+        @JoinColumn(name = "course_id")        Vise Versa it will be 1ToMany for course to review.
+        private Course course;
+
+    - ManyToMany (By default it is lazy loading)
+        @ManyToMany --> Many courses will be to student (mapping table will be created to map student to multiple course like student_course)
+        private List<Course> courses = new ArrayList<>();
+
+        @ManyToMany --> Many students will be to courses (mapping table will be created to map course to multiple student like course_student)
+        private List<Student> students = new ArrayList<>();
+
+        There will be two table created,
+                one for student to course ManyToMany mapping --> student_course
+                2nd for course to student ManyToMany mapping --> course_student
+        To overcome this problem need to provide mappedBy attribute in any class, let add in student class on course field
+            @ManyToMany(fetch = FetchType.LAZY, mappedBy = "students")
+            private List<Course> courses = new ArrayList<>();
+
+7:  SessionFactory/Session(Used in hibernate) VS EntityManager/PersistenceContext(JPA)
+
+8:  Table while inheritance
+    - @Inheritance(strategy = InheritanceType.SINGLE_TABLE)  --> All child class & parent class field will be merge in a single table
+      @DiscriminatorColumn(name = "EmployeeType")                   Good for performance but null value will be more.
+
+    - @Inheritance(strategy = InheritanceType.TABLE_PER_CLASS) --> each concrete class will be consider as single classs
+                                                                   Common columns will present in all concrete sub classes
+                                                                   Retrieve by union, good for performance
+                                                                   data redundancy due to common columns
+
+    - @DiscriminatorColumn(name = "EmployeeType") --> All classes will be in separate table
+                                                      Data will be retrieve by join
+                                                      No redundant data but performance compromise due to join
+    - @MappedSuperclass --> Need to remove @Entity & abstract parent class will not consider as entity
+                            Separate tables for it subclass will be created
+                            And all subclasses will be consider as separate entity
+
+9:  JPQL --> Java Persistence  Query Language
+        - Need to write query on Entity (Common for all DBs)
+        - ORM will map that query depending on DB used
+
+10: Criteria Query
+        - Writing Queries using Java.
+        - Yet to learn
+
+11: Transaction Management ( More Explore transaction api in java/spring)
+    - Prevent inconsistent state of data
+    - ACID properties - Atomicity, Consistency, Isolation and Durability
+    Isolation :
+        - Dirty Read --> reading modified value before transaction complete
+        - Non-Repeatable Read --> Reading a value twice and get 2 different value, reading is not repeating due to updated by some other thread
+        - Phantom Read --> Different time different value.
+        - Serializable -->
+
+   - @Transactional
+        - from JPA package will manage only DB transactions
+        - From spring backage manage any transaction like MQ read/write or DB update etc..
+
+12: Caching (Data Layer)
+    - First Level Cache --> - Each transaction has its own Persistence Context,
+                            - Caching at persistence context level is 1st level caching
+                              Or we can say single transaction level caching.
+                            - Active by default for all transaction
+
+    - Second Level Cache --> - Common information for all users/transaction.
+                                - Like list of states
+                                - List of countries
+                             - Multiple transaction level caching is called 2nd level caching.
+                             - Need to configure cache like ehcache and specify data to be cached
+
+
+13: Hibernate Performance Tuning
+    - Measure Performance by log state and tune
+    - Provide proper index
+    - Use proper caching
+    - Distributed cache like hassle cache
+    - Manager lazy and eager fetch properly
+    - N+1 problem -> n+1 queries will be fire while lazy fetch retrieval of all courses details with list of the students to that courses.
+        > Make it eager but lead again performance again.
+        > Passing hint to the query using EntityGraph to load it eager when ever required.
+        > Join fetch --> by creating named query using join fetch

@@ -1,0 +1,19 @@
+
+1-  SpringApplication.run(SpringJpaHibernateApplication.class, args); returns spring application context object.
+    We can store context object for any use.
+        Eg:
+            ApplicationContext context = SpringApplication.run(SpringJpaHibernateApplication.class, args);
+
+2-  @SpringBootApplication does 3 works
+        i.  Context initialization
+        ii. Autoconfiguration like dipatcher severlet, data source in case using jpa etc
+        iii.Component Scan on current package and its sub packages.
+
+3-  Actautor url changed
+        http://localhost:8080/actuator
+        http://localhost:8080/application
+        now it is : http://localhost:8080/actuator
+
+3-  HAL Browser help you to get all app related data
+        http://localhost:8080/
+
